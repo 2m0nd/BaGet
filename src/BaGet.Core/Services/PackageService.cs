@@ -40,6 +40,11 @@ namespace BaGet.Core.Services
                 .Where(p => p.VersionString == version.ToNormalizedString())
                 .AnyAsync();
 
+        public Task<bool> ExistsVersionsAsync(string id)
+            => _context.Packages
+                .Where(p => p.Id == id)
+                .AnyAsync();
+
         public async Task<IReadOnlyList<Package>> FindAsync(string id, bool includeUnlisted = false)
         {
             var query = _context.Packages.Where(p => p.Id == id);

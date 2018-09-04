@@ -19,6 +19,7 @@ namespace BaGet.Core.Services
         Task<IReadOnlyList<Package>> FindAsync(string id, bool includeUnlisted = false);
 
         Task<bool> ExistsAsync(string id, NuGetVersion version);
+        Task<bool> ExistsVersionsAsync(string id);
         Task<bool> UnlistPackageAsync(string id, NuGetVersion version);
         Task<bool> RelistPackageAsync(string id, NuGetVersion version);
         Task<bool> AddDownloadAsync(string id, NuGetVersion version);

@@ -197,6 +197,20 @@ namespace BaGet.Extensions
         /// <param name="services">The defined services.</param>
         public static IServiceCollection AddMirrorServices(this IServiceCollection services)
         {
+            services.AddSingleton(provider =>
+            {
+                var options = provider.GetRequiredService<IOptions<BaGetOptions>>().Value;
+
+                var client = new HttpClient(new HttpClientHandler
+                {
+                    AutomaticDecompression = (DecompressionMethods.GZip | DecompressionMethods.Deflate),
+                });
+
+                client.Timeout = TimeSpan.FromSeconds(options.Mirror.PackageDownloadTimeoutSeconds);
+
+                return client;
+            });
+
             services.AddTransient<IMirrorService>(provider =>
             {
                 var mirrorOptions = provider
@@ -213,6 +227,7 @@ namespace BaGet.Extensions
 
                 return new MirrorService(
                     mirrorOptions.PackageSource,
+                    provider.GetRequiredService<HttpClient>(),
                     provider.GetRequiredService<IPackageService>(),
                     provider.GetRequiredService<IPackageDownloader>(),
                     provider.GetRequiredService<IIndexingService>(),
@@ -221,19 +236,6 @@ namespace BaGet.Extensions
 
             services.AddTransient<IPackageDownloader, PackageDownloader>();
 
-            services.AddSingleton(provider =>
-            {
-                var options = provider.GetRequiredService<IOptions<BaGetOptions>>().Value;
-
-                var client = new HttpClient(new HttpClientHandler
-                {
-                    AutomaticDecompression = (DecompressionMethods.GZip | DecompressionMethods.Deflate),
-                });
-
-                client.Timeout = TimeSpan.FromSeconds(options.Mirror.PackageDownloadTimeoutSeconds);
-
-                return client;
-            });
 
             services.AddSingleton<DownloadsImporter>();
 

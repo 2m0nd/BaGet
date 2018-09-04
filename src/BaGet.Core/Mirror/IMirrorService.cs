@@ -6,5 +6,6 @@ namespace BaGet.Core.Mirror
     public interface IMirrorService
     {
         Task MirrorAsync(string id, NuGetVersion version);
+        Task<VersionsResponse> MirrorVersionsAsync(string id);
     }
 }

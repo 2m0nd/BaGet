@@ -25,15 +25,20 @@ namespace BaGet.Controllers
         public async Task<IActionResult> Versions(string id)
         {
             var packages = await _packages.FindAsync(id);
-
-            if (!packages.Any())
+            var sourcePackages = await _mirror.MirrorVersionsAsync(id);
+            if (!packages.Any() && !sourcePackages.Versions.Any())
             {
                 return NotFound();
             }
 
+            var allAvalibleVersions =
+                packages.Select(p => p.VersionString)
+                    .ToList()
+                    .Concat(sourcePackages.Versions);
+                    
             return Json(new
             {
-                Versions = packages.Select(p => p.VersionString).ToList()
+                Versions = allAvalibleVersions
             });
         }
 

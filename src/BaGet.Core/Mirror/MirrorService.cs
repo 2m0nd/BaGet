@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using BaGet.Core.Services;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using NuGet.Versioning;
 
 namespace BaGet.Core.Mirror
@@ -10,6 +12,7 @@ namespace BaGet.Core.Mirror
     public class MirrorService : IMirrorService
     {
         private readonly Uri _packageBaseAddress;
+        private readonly HttpClient _httpClient;
         private readonly IPackageService _localPackages;
         private readonly IPackageDownloader _downloader;
         private readonly IIndexingService _indexer;
@@ -17,12 +20,14 @@ namespace BaGet.Core.Mirror
 
         public MirrorService(
             Uri packageBaseAddress,
+            HttpClient httpClient,
             IPackageService localPackages,
             IPackageDownloader downloader,
             IIndexingService indexer,
             ILogger<MirrorService> logger)
         {
             _packageBaseAddress = packageBaseAddress ?? throw new ArgumentNullException(nameof(packageBaseAddress));
+            _httpClient = httpClient;
             _localPackages = localPackages ?? throw new ArgumentNullException(nameof(localPackages));
             _downloader = downloader ?? throw new ArgumentNullException(nameof(downloader));
             _indexer = indexer ?? throw new ArgumentNullException(nameof(indexer));
@@ -39,6 +44,38 @@ namespace BaGet.Core.Mirror
             await TryIndexFromSourceAsync(id, version);
         }
 
+        public async Task<VersionsResponse> MirrorVersionsAsync(string id)
+        {
+            if (await _localPackages.ExistsVersionsAsync(id))
+            {
+                return new VersionsResponse();
+            }
+
+            return await TryIndexVersionsFromSourceAsync(id);
+        }
+
+        private async Task<VersionsResponse> TryIndexVersionsFromSourceAsync(string id)
+        {
+            var idString = id.ToLowerInvariant();
+
+            _logger.LogInformation(
+                "Attempting to index package {Id} from upstream source...",
+                idString);
+
+            try
+            {
+                // See https://github.com/NuGet/NuGet.Client/blob/4eed67e7e159796ae486d2cca406b283e23b6ac8/src/NuGet.Core/NuGet.Protocol/Resources/DownloadResourceV3.cs#L82
+                var packageUri = new Uri(_packageBaseAddress, $"{idString}/index.json");
+                var response = await _httpClient.GetStringAsync(packageUri);
+                return JsonConvert.DeserializeObject<VersionsResponse>(response);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Failed to index package {Id}", idString);
+                return new VersionsResponse();
+            }
+        }
+
         private async Task<bool> TryIndexFromSourceAsync(string id, NuGetVersion version)
         {
             var idString = id.ToLowerInvariant();
@@ -52,7 +89,8 @@ namespace BaGet.Core.Mirror
             try
             {
                 // See https://github.com/NuGet/NuGet.Client/blob/4eed67e7e159796ae486d2cca406b283e23b6ac8/src/NuGet.Core/NuGet.Protocol/Resources/DownloadResourceV3.cs#L82
-                var packageUri = new Uri(_packageBaseAddress, $"{idString}/{versionString}/{idString}.{versionString}.nupkg");
+                var packageUri = new Uri(_packageBaseAddress,
+                    $"{idString}/{versionString}/{idString}.{versionString}.nupkg");
 
                 // TODO: DownloadAsync throws when the package doesn't exist. This could be cleaner.
                 using (var stream = await _downloader.DownloadAsync(packageUri, CancellationToken.None))
